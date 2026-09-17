@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import type { Bvs } from './types';
 import { BVS_FLEET } from './types';
 import {
   Table,
