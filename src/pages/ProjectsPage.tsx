@@ -1,14 +1,27 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { ProjectForm } from '@/features/projects/ProjectForm';
-import { SurveyMap } from '@/features/map/SurveyMap';
 import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout';
 import { Map as MapIcon } from 'lucide-react';
+
+// Ленивая загрузка карты: OpenLayers (~600 КБ) не попадёт
+// в основной бандл и загрузится только при первом открытии страницы.
+const SurveyMap = lazy(() =>
+  import('@/features/map/SurveyMap').then((m) => ({ default: m.SurveyMap })),
+);
 
 interface RouteResult {
   droneId: number;
   lengthKm: number;
   timeMin: number;
   photos: number;
+}
+
+function MapFallback() {
+  return (
+    <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+      Загрузка карты…
+    </div>
+  );
 }
 
 export function ProjectsPage() {
@@ -60,7 +73,11 @@ export function ProjectsPage() {
   return (
     <WorkspaceLayout
       leftPanel={leftPanel}
-      centerContent={<SurveyMap onRoutesCalculated={setRoutes} />}
+      centerContent={
+        <Suspense fallback={<MapFallback />}>
+          <SurveyMap onRoutesCalculated={setRoutes} />
+        </Suspense>
+      }
       rightPanel={rightPanel}
     />
   );

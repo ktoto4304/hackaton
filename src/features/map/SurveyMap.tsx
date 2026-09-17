@@ -136,15 +136,13 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
     if (mapInstanceRef.current || !mapRef.current) return;
     let cancelled = false;
     let retryCount = 0;
-    const MAX_RETRIES = 60; // ~1 сек при 60fps
+    const MAX_RETRIES = 60;
 
     const createMap = () => {
       if (cancelled) return;
       const el = mapRef.current;
       if (!el) return;
 
-      // Ждём, пока контейнер получит И ширину, И высоту.
-      // Без этого OpenLayers пишет "container's width or height are 0".
       if (el.clientHeight === 0 || el.clientWidth === 0) {
         retryCount++;
         if (retryCount < MAX_RETRIES) {
@@ -237,7 +235,6 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
         if (z !== undefined) setZoom(z);
       });
 
-      // ResizeObserver — вызываем updateSize только если размеры > 0
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
           const { width, height } = entry.contentRect;
@@ -248,7 +245,6 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
       });
       observer.observe(el);
 
-      // Первичный пересчёт и подгонка
       requestAnimationFrame(() => {
         map.updateSize();
         fitToFeatures();
@@ -363,8 +359,6 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
     const results: RouteResult[] = [];
 
     collection.features.forEach((f: any, i: number) => {
-      // readFeature типизирован как Feature | Feature[] — приводим к Feature,
-      // т.к. на вход подаём одиночный GeoJSON-объект фичи.
       const olFeature = format.readFeature(f, {
         dataProjection: 'EPSG:4326',
         featureProjection: 'EPSG:3857',
@@ -405,16 +399,12 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
 
   return (
     <div className="relative h-full w-full">
-      {/* Контейнер карты: absolute inset-0 с явными размерами */}
       <div
         ref={mapRef}
         className="absolute inset-0"
         style={{ width: '100%', height: '100%' }}
       />
 
-      {/* Панель кнопок карты: опущена на top-16, чтобы не пересекаться
-          с кнопками сворачивания панелей (они на top-4).
-          max-w ограничивает ширину, чтобы не залезть под правую кнопку. */}
       <div className="absolute top-16 left-4 z-10 flex flex-wrap gap-2 rounded-lg bg-background/90 p-2 shadow-lg border border-border backdrop-blur max-w-[calc(100%-2rem)]">
         <Button
           variant={mode === 'polygon' ? 'default' : 'outline'}
