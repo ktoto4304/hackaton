@@ -363,10 +363,13 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
     const results: RouteResult[] = [];
 
     collection.features.forEach((f: any, i: number) => {
+      // readFeature типизирован как Feature | Feature[] — приводим к Feature,
+      // т.к. на вход подаём одиночный GeoJSON-объект фичи.
       const olFeature = format.readFeature(f, {
         dataProjection: 'EPSG:4326',
         featureProjection: 'EPSG:3857',
-      });
+      }) as Feature;
+
       olFeature.set('droneId', i);
       routeSource.addFeature(olFeature);
 
