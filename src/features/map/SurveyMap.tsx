@@ -179,7 +179,7 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
         layers: [
           new TileLayer({
             source: new XYZ({
-              url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_3oi5_1_1c942169cc34b90c0b3b0cdb',
+              url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
               attributions: '© OpenStreetMap contributors © CARTO',
             }),
           }),
@@ -405,12 +405,18 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
         style={{ width: '100%', height: '100%' }}
       />
 
-      <div className="absolute top-16 left-4 z-10 flex flex-wrap gap-2 rounded-lg bg-background/90 p-2 shadow-lg border border-border backdrop-blur max-w-[calc(100%-2rem)]">
+      {/* Панель кнопок:
+          - На тач-экранах опущена ниже (top-20), т.к. кнопки сворачивания
+            панелей там крупнее (44px).
+          - max-w ограничивает ширину.
+          - Кнопки выше на тач (h-11), ниже на десктопе (lg:h-8). */}
+      <div className="absolute top-20 lg:top-16 left-4 right-4 lg:right-auto z-10 flex flex-wrap gap-2 rounded-lg bg-background/90 p-2 shadow-lg border border-border backdrop-blur lg:max-w-[calc(100%-2rem)]">
         <Button
           variant={mode === 'polygon' ? 'default' : 'outline'}
           size="sm"
           disabled={mode === 'point'}
           onClick={() => setMode(mode === 'polygon' ? 'none' : 'polygon')}
+          className="h-11 lg:h-8"
         >
           {mode === 'polygon' ? 'Отменить' : 'Нарисовать полигон'}
         </Button>
@@ -419,23 +425,39 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
           size="sm"
           disabled={mode === 'polygon'}
           onClick={() => setMode(mode === 'point' ? 'none' : 'point')}
+          className="h-11 lg:h-8"
         >
           {mode === 'point' ? 'Отменить' : 'Добавить ВПП'}
         </Button>
-        <Button variant="default" size="sm" onClick={calculateRoutes}>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={calculateRoutes}
+          className="h-11 lg:h-8"
+        >
           Рассчитать маршруты
         </Button>
-        <Button variant="outline" size="sm" onClick={fitToFeatures}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fitToFeatures}
+          className="h-11 lg:h-8"
+        >
           Показать всё
         </Button>
-        <Button variant="outline" size="sm" onClick={clearAll}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={clearAll}
+          className="h-11 lg:h-8"
+        >
           Очистить
         </Button>
       </div>
 
       {!hasPolygon && (
         <div className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none">
-          <div className="rounded-lg bg-background/95 px-6 py-4 text-center shadow-lg border border-border">
+          <div className="rounded-lg bg-background/95 px-6 py-4 text-center shadow-lg border border-border mx-4">
             <p className="text-sm font-medium">Нарисуйте область съёмки</p>
             <p className="text-xs text-muted-foreground mt-1">
               Нажмите «Нарисовать полигон» и обведите зону на карте
@@ -444,14 +466,14 @@ export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
         </div>
       )}
 
-      <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between border-t border-border bg-background/90 px-4 py-1.5 text-xs text-muted-foreground backdrop-blur">
-        <span>
+      <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between border-t border-border bg-background/90 px-3 lg:px-4 py-2 lg:py-1.5 text-xs text-muted-foreground backdrop-blur gap-2">
+        <span className="truncate">
           {cursorCoords
-            ? `${cursorCoords.lat.toFixed(5)}°, ${cursorCoords.lon.toFixed(5)}°`
+            ? `${cursorCoords.lat.toFixed(4)}°, ${cursorCoords.lon.toFixed(4)}°`
             : 'Наведите на карту'}
         </span>
-        <span>Масштаб: {zoom.toFixed(1)}</span>
-        <span>Маршрутов: {routes.length}</span>
+        <span className="whitespace-nowrap">Масштаб: {zoom.toFixed(1)}</span>
+        <span className="whitespace-nowrap">Маршрутов: {routes.length}</span>
       </div>
     </div>
   );

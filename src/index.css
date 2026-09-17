@@ -121,17 +121,23 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html, body, #root {
+    height: 100%;
+  }
   body {
     @apply bg-background text-foreground;
+    /* Убираем 300ms задержку тапа и «двойной тап-зум» на кнопках */
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
   }
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
 }
 
-/* OpenLayers: гарантируем, что viewport карты занимает весь контейнер.
-   Без этого при некоторых комбинациях Tailwind + OL карта может
-   получить нулевые размеры, даже если родитель корректен. */
+/* OpenLayers: viewport карты занимает весь контейнер */
 .ol-viewport {
   width: 100% !important;
   height: 100% !important;
@@ -139,4 +145,12 @@
 
 .ol-viewport canvas {
   display: block;
+}
+
+/* На тач-устройствах увеличиваем hit-area у OL-контролов, если они появятся */
+@media (pointer: coarse) {
+  .ol-control button {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
 }

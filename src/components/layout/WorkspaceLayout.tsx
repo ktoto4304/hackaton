@@ -9,8 +9,8 @@ interface WorkspaceLayoutProps {
   rightPanel: React.ReactNode;
 }
 
-const LEFT_WIDTH = '20rem';
-const RIGHT_WIDTH = '24rem';
+const LEFT_WIDTH = 'clamp(16rem, 22vw, 20rem)';
+const RIGHT_WIDTH = 'clamp(18rem, 26vw, 24rem)';
 
 export function WorkspaceLayout({
   leftPanel,
@@ -31,43 +31,53 @@ export function WorkspaceLayout({
   const transitionClass = mounted ? 'transition-all duration-300' : '';
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden">
+    <div
+      className="relative flex h-full w-full min-h-0 overflow-hidden"
+      style={
+        {
+          '--left-w': LEFT_WIDTH,
+          '--right-w': RIGHT_WIDTH,
+        } as React.CSSProperties
+      }
+    >
       {/* Левая панель */}
       <div
         className={`relative h-full shrink-0 border-r border-border bg-card ${transitionClass}`}
-        style={{ width: leftOpen ? LEFT_WIDTH : '0px' }}
+        style={{ width: leftOpen ? 'var(--left-w)' : '0px' }}
       >
-        {leftOpen && <div className="h-full overflow-auto p-4">{leftPanel}</div>}
+        {leftOpen && <div className="h-full overflow-auto p-3 lg:p-4">{leftPanel}</div>}
       </div>
 
       {/* Кнопка сворачивания левой панели */}
       <Button
         size="icon"
-        className={`absolute top-4 z-30 h-8 w-8 rounded-full shadow-lg border border-border bg-background hover:bg-accent text-foreground ${transitionClass}`}
-        style={{ left: leftOpen ? `calc(${LEFT_WIDTH} - 1rem)` : '0.5rem' }}
+        aria-label={leftOpen ? 'Свернуть левую панель' : 'Развернуть левую панель'}
+        className={`absolute top-4 z-30 h-11 w-11 lg:h-8 lg:w-8 rounded-full shadow-lg border border-border bg-background hover:bg-accent text-foreground ${transitionClass}`}
+        style={{ left: leftOpen ? 'calc(var(--left-w) - 1.25rem)' : '0.5rem' }}
         onClick={toggleLeft}
       >
         {leftOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       </Button>
 
-      {/* Центр: h-full + flex-1 + w-full. Без min-w-0, чтобы не схлопывался */}
-      <div className="relative h-full flex-1 w-full overflow-hidden">
+      {/* Центр */}
+      <div className="relative h-full flex-1 min-w-0 min-h-0 overflow-hidden">
         {centerContent}
       </div>
 
       {/* Правая панель */}
       <div
         className={`relative h-full shrink-0 border-l border-border bg-card ${transitionClass}`}
-        style={{ width: rightOpen ? RIGHT_WIDTH : '0px' }}
+        style={{ width: rightOpen ? 'var(--right-w)' : '0px' }}
       >
-        {rightOpen && <div className="h-full overflow-auto p-4">{rightPanel}</div>}
+        {rightOpen && <div className="h-full overflow-auto p-3 lg:p-4">{rightPanel}</div>}
       </div>
 
       {/* Кнопка сворачивания правой панели */}
       <Button
         size="icon"
-        className={`absolute top-4 z-30 h-8 w-8 rounded-full shadow-lg border border-border bg-background hover:bg-accent text-foreground ${transitionClass}`}
-        style={{ right: rightOpen ? `calc(${RIGHT_WIDTH} - 1rem)` : '0.5rem' }}
+        aria-label={rightOpen ? 'Свернуть правую панель' : 'Развернуть правую панель'}
+        className={`absolute top-4 z-30 h-11 w-11 lg:h-8 lg:w-8 rounded-full shadow-lg border border-border bg-background hover:bg-accent text-foreground ${transitionClass}`}
+        style={{ right: rightOpen ? 'calc(var(--right-w) - 1.25rem)' : '0.5rem' }}
         onClick={toggleRight}
       >
         {rightOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
