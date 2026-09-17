@@ -1,15 +1,15 @@
-// src/features/map/SurveyMap.tsx
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import OSM from 'ol/source/OSM';
+import XYZ from 'ol/source/XYZ';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import Polygon from 'ol/geom/Polygon';
-import { fromLonLat } from 'ol/proj';
+import LineString from 'ol/geom/LineString';
+import { fromLonLat, toLonLat } from 'ol/proj';
 import { Style, Fill, Stroke, Circle as CircleStyle } from 'ol/style';
 import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
@@ -17,6 +17,8 @@ import GeoJSON from 'ol/format/GeoJSON';
 import DragPan from 'ol/interaction/DragPan';
 import 'ol/ol.css';
 import { Button } from '@/components/ui/button';
+import { notification } from 'antd';
+import { planMultiPath } from 'planefill';
 
 // --- Стили ---
 const pointStyle = new Style({
@@ -32,7 +34,17 @@ const polygonStyle = new Style({
   stroke: new Stroke({ color: '#3b82f6', width: 2 }),
 });
 
-// --- Хардкод стартовых данных ---
+const ROUTE_COLORS = ['#16a34a', '#eab308', '#ec4899', '#8b5cf6', '#f97316'];
+
+function makeRouteStyle(droneId: number) {
+  return new Style({
+    stroke: new Stroke({
+      color: ROUTE_COLORS[droneId % ROUTE_COLORS.length],
+      width: 3,
+    }),
+  });
+}
+
 const INITIAL_RUNWAYS: { lonLat: [number, number]; name: string }[] = [
   { lonLat: [37.6173, 55.7558], name: 'ВПП №1 (основная)' },
   { lonLat: [37.621, 55.758], name: 'ВПП №2 (запасная)' },
@@ -49,29 +61,41 @@ const INITIAL_POLYGON_LONLAT: [number, number][] = [
 
 type DrawMode = 'none' | 'polygon' | 'point';
 
-export function SurveyMap() {
+interface RouteResult {
+  droneId: number;
+  lengthKm: number;
+  timeMin: number;
+  photos: number;
+}
+
+interface SurveyMapProps {
+  onRoutesCalculated?: (routes: RouteResult[]) => void;
+}
+
+export function SurveyMap({ onRoutesCalculated }: SurveyMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const pointsSourceRef = useRef<VectorSource | null>(null);
   const polygonSourceRef = useRef<VectorSource | null>(null);
+  const routeSourceRef = useRef<VectorSource | null>(null);
   const drawInteractionRef = useRef<Draw | null>(null);
 
   const [mode, setMode] = useState<DrawMode>('none');
-  const [polygonGeoJSON, setPolygonGeoJSON] = useState<string | null>(null);
-  const [pointsGeoJSON, setPointsGeoJSON] = useState<string[]>([]);
+  const [routes, setRoutes] = useState<RouteResult[]>([]);
+  const [hasPolygon, setHasPolygon] = useState(false);
+  const [cursorCoords, setCursorCoords] = useState<{ lon: number; lat: number } | null>(null);
+  const [zoom, setZoom] = useState(14);
 
-  // --- fitBounds с защитой от пустого extent ---
   const fitToFeatures = useCallback(() => {
     const map = mapInstanceRef.current;
-    const pointSource = pointsSourceRef.current;
-    const polygonSource = polygonSourceRef.current;
     if (!map) return;
 
-    const allFeatures = [
-      ...(pointSource?.getFeatures() ?? []),
-      ...(polygonSource?.getFeatures() ?? []),
+    const sources = [
+      pointsSourceRef.current,
+      polygonSourceRef.current,
+      routeSourceRef.current,
     ];
-
+    const allFeatures = sources.flatMap((s) => s?.getFeatures() ?? []);
     if (allFeatures.length === 0) return;
 
     const combined = allFeatures.reduce<number[] | null>((acc, f) => {
@@ -96,7 +120,6 @@ export function SurveyMap() {
     });
   }, []);
 
-  // --- Сброс «залипшего» DragPan ---
   const resetDragPan = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -108,100 +131,152 @@ export function SurveyMap() {
     });
   }, []);
 
-  // --- Инициализация карты (один раз) ---
+  // --- Инициализация карты ---
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (mapInstanceRef.current || !mapRef.current) return;
+    let cancelled = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 60; // ~1 сек при 60fps
 
-    // Слой точек ВПП
-    const pointsSource = new VectorSource();
-    INITIAL_RUNWAYS.forEach(({ lonLat, name }) => {
-      const f = new Feature({
-        geometry: new Point(fromLonLat(lonLat)),
-        name,
-      });
-      f.setStyle(pointStyle);
-      pointsSource.addFeature(f);
-    });
-    const pointsLayer = new VectorLayer({
-      source: pointsSource,
-      style: pointStyle,
-    });
+    const createMap = () => {
+      if (cancelled) return;
+      const el = mapRef.current;
+      if (!el) return;
 
-    // Слой полигона
-    const polygonSource = new VectorSource();
-    const polygonFeature = new Feature({
-      geometry: new Polygon([
-        INITIAL_POLYGON_LONLAT.map(([lon, lat]) => fromLonLat([lon, lat])),
-      ]),
-    });
-    polygonFeature.setStyle(polygonStyle);
-    polygonSource.addFeature(polygonFeature);
-    const polygonLayer = new VectorLayer({
-      source: polygonSource,
-      style: polygonStyle,
-    });
-
-    const map = new Map({
-      target: mapRef.current,
-      layers: [
-        new TileLayer({ source: new OSM() }),
-        polygonLayer,
-        pointsLayer,
-      ],
-      view: new View({
-        center: fromLonLat([37.6173, 55.7558]),
-        zoom: 14,
-      }),
-    });
-
-    mapInstanceRef.current = map;
-    pointsSourceRef.current = pointsSource;
-    polygonSourceRef.current = polygonSource;
-
-    // --- Popup: всплывающее название ВПП ---
-    const popupEl = document.createElement('div');
-    popupEl.className =
-      'bg-white px-3 py-2 rounded shadow text-sm border border-gray-200 pointer-events-none';
-    const popup = new Overlay({
-      element: popupEl,
-      positioning: 'bottom-center',
-      offset: [0, -12],
-    });
-    map.addOverlay(popup);
-
-    map.on('click', (evt) => {
-      const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f, {
-        hitTolerance: 6,
-      });
-      const name = feature?.get('name') as string | undefined;
-      if (name) {
-        popupEl.textContent = name;
-        popup.setPosition(evt.coordinate);
-      } else {
-        popup.setPosition(undefined);
+      // Ждём, пока контейнер получит И ширину, И высоту.
+      // Без этого OpenLayers пишет "container's width or height are 0".
+      if (el.clientHeight === 0 || el.clientWidth === 0) {
+        retryCount++;
+        if (retryCount < MAX_RETRIES) {
+          requestAnimationFrame(createMap);
+        } else {
+          console.warn(
+            'SurveyMap: контейнер карты так и не получил размеры',
+            { w: el.clientWidth, h: el.clientHeight }
+          );
+        }
+        return;
       }
-    });
 
-    setTimeout(() => fitToFeatures(), 0);
+      const pointsSource = new VectorSource();
+      INITIAL_RUNWAYS.forEach(({ lonLat, name }) => {
+        const f = new Feature({ geometry: new Point(fromLonLat(lonLat)), name });
+        f.setStyle(pointStyle);
+        pointsSource.addFeature(f);
+      });
+
+      const polygonSource = new VectorSource();
+      const polygonFeature = new Feature({
+        geometry: new Polygon([
+          INITIAL_POLYGON_LONLAT.map(([lon, lat]) => fromLonLat([lon, lat])),
+        ]),
+      });
+      polygonFeature.setStyle(polygonStyle);
+      polygonSource.addFeature(polygonFeature);
+
+      const routeSource = new VectorSource();
+
+      const map = new Map({
+        target: el,
+        layers: [
+          new TileLayer({
+            source: new XYZ({
+              url: 'https://{a-c}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=cb1_3oi5_1_1c942169cc34b90c0b3b0cdb',
+              attributions: '© OpenStreetMap contributors © CARTO',
+            }),
+          }),
+          new VectorLayer({ source: polygonSource, style: polygonStyle }),
+          new VectorLayer({ source: pointsSource, style: pointStyle }),
+          new VectorLayer({
+            source: routeSource,
+            style: (feature) => makeRouteStyle(feature.get('droneId') as number),
+          }),
+        ],
+        view: new View({
+          center: fromLonLat([37.6173, 55.7558]),
+          zoom: 14,
+        }),
+      });
+
+      mapInstanceRef.current = map;
+      pointsSourceRef.current = pointsSource;
+      polygonSourceRef.current = polygonSource;
+      routeSourceRef.current = routeSource;
+      setHasPolygon(polygonSource.getFeatures().length > 0);
+
+      const popupEl = document.createElement('div');
+      popupEl.className =
+        'bg-white px-3 py-2 rounded shadow text-sm border border-gray-200 pointer-events-none';
+      const popup = new Overlay({
+        element: popupEl,
+        positioning: 'bottom-center',
+        offset: [0, -12],
+      });
+      map.addOverlay(popup);
+
+      map.on('click', (evt) => {
+        const feature = map.forEachFeatureAtPixel(evt.pixel, (f) => f, {
+          hitTolerance: 6,
+        });
+        const name = feature?.get('name') as string | undefined;
+        if (name) {
+          popupEl.textContent = name;
+          popup.setPosition(evt.coordinate);
+        } else {
+          popup.setPosition(undefined);
+        }
+      });
+
+      map.on('pointermove', (evt) => {
+        const [lon, lat] = toLonLat(evt.coordinate);
+        setCursorCoords({ lon, lat });
+      });
+
+      map.on('moveend', () => {
+        const z = map.getView().getZoom();
+        if (z !== undefined) setZoom(z);
+      });
+
+      // ResizeObserver — вызываем updateSize только если размеры > 0
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          if (width > 0 && height > 0) {
+            map.updateSize();
+          }
+        }
+      });
+      observer.observe(el);
+
+      // Первичный пересчёт и подгонка
+      requestAnimationFrame(() => {
+        map.updateSize();
+        fitToFeatures();
+      });
+    };
+
+    requestAnimationFrame(createMap);
 
     return () => {
-      map.setTarget(undefined);
-      mapInstanceRef.current = null;
-      pointsSourceRef.current = null;
-      polygonSourceRef.current = null;
+      cancelled = true;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setTarget(undefined);
+        mapInstanceRef.current = null;
+        pointsSourceRef.current = null;
+        polygonSourceRef.current = null;
+        routeSourceRef.current = null;
+      }
     };
   }, [fitToFeatures]);
 
-  // --- Управление интеракциями при смене режима ---
+  // --- Draw ---
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-
     if (drawInteractionRef.current) {
       map.removeInteraction(drawInteractionRef.current);
       drawInteractionRef.current = null;
     }
-
     if (mode === 'none') return;
 
     const source =
@@ -215,27 +290,19 @@ export function SurveyMap() {
     });
 
     draw.on('drawend', (e) => {
-      const format = new GeoJSON();
-      const geojson = format.writeGeometry(e.feature.getGeometry()!);
-
       if (mode === 'polygon') {
-        // Удаляем все полигоны, кроме только что нарисованного
         source.getFeatures().forEach((f) => {
           if (f !== e.feature) source.removeFeature(f);
         });
-        setPolygonGeoJSON(geojson);
+        setHasPolygon(true);
       } else {
         const count = pointsSourceRef.current!.getFeatures().length;
         e.feature.set('name', `ВПП №${count}`);
-        setPointsGeoJSON((prev) => [...prev, geojson]);
       }
 
-      // Не вызываем finishDrawing и не добавляем фичу — Draw уже сделал это.
-      // Просто выключаем и убираем интеракцию.
       draw.setActive(false);
       map.removeInteraction(draw);
       drawInteractionRef.current = null;
-
       resetDragPan();
 
       setMode('none');
@@ -261,48 +328,137 @@ export function SurveyMap() {
     };
   }, [mode, fitToFeatures, resetDragPan]);
 
+  const calculateRoutes = useCallback(() => {
+    const map = mapInstanceRef.current;
+    const routeSource = routeSourceRef.current;
+    const polygonSource = polygonSourceRef.current;
+    if (!map || !routeSource || !polygonSource) return;
+
+    const polygonFeatures = polygonSource.getFeatures();
+    if (polygonFeatures.length === 0) {
+      notification.warning({
+        message: 'Нет области съёмки',
+        description: 'Сначала нарисуйте полигон на карте',
+        placement: 'topRight',
+      });
+      return;
+    }
+
+    const droneCount = 2;
+
+    const format = new GeoJSON();
+    const polygonGeoJSON = format.writeFeatureObject(polygonFeatures[0], {
+      dataProjection: 'EPSG:4326',
+      featureProjection: 'EPSG:3857',
+    });
+
+    const collection = planMultiPath(polygonGeoJSON as any, {
+      parties: droneCount,
+      divisionStrategy: 'balanced',
+      coverageStrategy: 'boustrophedon',
+      spacing: 30,
+    });
+
+    routeSource.clear();
+    const results: RouteResult[] = [];
+
+    collection.features.forEach((f: any, i: number) => {
+      const olFeature = format.readFeature(f, {
+        dataProjection: 'EPSG:4326',
+        featureProjection: 'EPSG:3857',
+      });
+      olFeature.set('droneId', i);
+      routeSource.addFeature(olFeature);
+
+      const line = olFeature.getGeometry() as LineString;
+      const lengthM = line.getLength();
+      const lengthKm = lengthM / 1000;
+
+      const speedKmh = 40;
+      const timeMin = (lengthKm / speedKmh) * 60;
+      const photos = Math.round(lengthM / 30);
+
+      results.push({ droneId: i, lengthKm, timeMin, photos });
+    });
+
+    setRoutes(results);
+    onRoutesCalculated?.(results);
+    setTimeout(() => fitToFeatures(), 100);
+
+    notification.success({
+      message: 'Расчёт завершён',
+      description: `Построено маршрутов: ${results.length}`,
+      placement: 'topRight',
+    });
+  }, [fitToFeatures, onRoutesCalculated]);
+
+  const clearAll = useCallback(() => {
+    polygonSourceRef.current?.clear();
+    pointsSourceRef.current?.clear();
+    routeSourceRef.current?.clear();
+    setRoutes([]);
+    setHasPolygon(false);
+  }, []);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+    <div className="relative h-full w-full">
+      {/* Контейнер карты: absolute inset-0 с явными размерами */}
+      <div
+        ref={mapRef}
+        className="absolute inset-0"
+        style={{ width: '100%', height: '100%' }}
+      />
+
+      {/* Панель кнопок карты: опущена на top-16, чтобы не пересекаться
+          с кнопками сворачивания панелей (они на top-4).
+          max-w ограничивает ширину, чтобы не залезть под правую кнопку. */}
+      <div className="absolute top-16 left-4 z-10 flex flex-wrap gap-2 rounded-lg bg-background/90 p-2 shadow-lg border border-border backdrop-blur max-w-[calc(100%-2rem)]">
         <Button
           variant={mode === 'polygon' ? 'default' : 'outline'}
+          size="sm"
           disabled={mode === 'point'}
           onClick={() => setMode(mode === 'polygon' ? 'none' : 'polygon')}
         >
-          {mode === 'polygon' ? 'Отменить рисование' : 'Нарисовать полигон'}
+          {mode === 'polygon' ? 'Отменить' : 'Нарисовать полигон'}
         </Button>
         <Button
           variant={mode === 'point' ? 'default' : 'outline'}
+          size="sm"
           disabled={mode === 'polygon'}
           onClick={() => setMode(mode === 'point' ? 'none' : 'point')}
         >
-          {mode === 'point' ? 'Отменить добавление' : 'Добавить ВПП'}
+          {mode === 'point' ? 'Отменить' : 'Добавить ВПП'}
         </Button>
-        <Button variant="outline" onClick={fitToFeatures}>
+        <Button variant="default" size="sm" onClick={calculateRoutes}>
+          Рассчитать маршруты
+        </Button>
+        <Button variant="outline" size="sm" onClick={fitToFeatures}>
           Показать всё
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            polygonSourceRef.current?.clear();
-            pointsSourceRef.current?.clear();
-            setPolygonGeoJSON(null);
-            setPointsGeoJSON([]);
-          }}
-        >
+        <Button variant="outline" size="sm" onClick={clearAll}>
           Очистить
         </Button>
       </div>
 
-      <div
-        ref={mapRef}
-        style={{ height: '600px', width: '100%' }}
-        className="rounded-lg overflow-hidden border border-border"
-      />
+      {!hasPolygon && (
+        <div className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none">
+          <div className="rounded-lg bg-background/95 px-6 py-4 text-center shadow-lg border border-border">
+            <p className="text-sm font-medium">Нарисуйте область съёмки</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Нажмите «Нарисовать полигон» и обведите зону на карте
+            </p>
+          </div>
+        </div>
+      )}
 
-      <div className="text-xs text-muted-foreground space-y-1">
-        <div>Точек ВПП: {pointsGeoJSON.length}</div>
-        <div>Полигон: {polygonGeoJSON ? 'есть' : 'нет'}</div>
+      <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-between border-t border-border bg-background/90 px-4 py-1.5 text-xs text-muted-foreground backdrop-blur">
+        <span>
+          {cursorCoords
+            ? `${cursorCoords.lat.toFixed(5)}°, ${cursorCoords.lon.toFixed(5)}°`
+            : 'Наведите на карту'}
+        </span>
+        <span>Масштаб: {zoom.toFixed(1)}</span>
+        <span>Маршрутов: {routes.length}</span>
       </div>
     </div>
   );

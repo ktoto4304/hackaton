@@ -120,11 +120,23 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
+}
+
+/* OpenLayers: гарантируем, что viewport карты занимает весь контейнер.
+   Без этого при некоторых комбинациях Tailwind + OL карта может
+   получить нулевые размеры, даже если родитель корректен. */
+.ol-viewport {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.ol-viewport canvas {
+  display: block;
 }
