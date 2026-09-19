@@ -31,6 +31,8 @@ export function WorkspaceLayout({
   const transitionClass = mounted ? 'transition-all duration-300' : '';
 
   return (
+    // h-full + min-h-0 — берём высоту от родителя (Outlet в AppLayout,
+    // который имеет высоту через flex-1 min-h-0).
     <div
       className="relative flex h-full w-full min-h-0 overflow-hidden"
       style={
@@ -45,7 +47,9 @@ export function WorkspaceLayout({
         className={`relative h-full shrink-0 border-r border-border bg-card ${transitionClass}`}
         style={{ width: leftOpen ? 'var(--left-w)' : '0px' }}
       >
-        {leftOpen && <div className="h-full overflow-auto p-3 lg:p-4">{leftPanel}</div>}
+        {leftOpen && (
+          <div className="h-full overflow-auto p-3 lg:p-4">{leftPanel}</div>
+        )}
       </div>
 
       {/* Кнопка сворачивания левой панели */}
@@ -56,10 +60,15 @@ export function WorkspaceLayout({
         style={{ left: leftOpen ? 'calc(var(--left-w) - 1.25rem)' : '0.5rem' }}
         onClick={toggleLeft}
       >
-        {leftOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        {leftOpen ? (
+          <ChevronLeft className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
       </Button>
 
-      {/* Центр */}
+      {/* Центр: h-full + flex-1 + min-w-0 + min-h-0 + relative.
+          Именно этот div даёт высоту SurveyMap. */}
       <div className="relative h-full flex-1 min-w-0 min-h-0 overflow-hidden">
         {centerContent}
       </div>
@@ -69,7 +78,9 @@ export function WorkspaceLayout({
         className={`relative h-full shrink-0 border-l border-border bg-card ${transitionClass}`}
         style={{ width: rightOpen ? 'var(--right-w)' : '0px' }}
       >
-        {rightOpen && <div className="h-full overflow-auto p-3 lg:p-4">{rightPanel}</div>}
+        {rightOpen && (
+          <div className="h-full overflow-auto p-3 lg:p-4">{rightPanel}</div>
+        )}
       </div>
 
       {/* Кнопка сворачивания правой панели */}
@@ -80,7 +91,11 @@ export function WorkspaceLayout({
         style={{ right: rightOpen ? 'calc(var(--right-w) - 1.25rem)' : '0.5rem' }}
         onClick={toggleRight}
       >
-        {rightOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        {rightOpen ? (
+          <ChevronRight className="h-4 w-4" />
+        ) : (
+          <ChevronLeft className="h-4 w-4" />
+        )}
       </Button>
     </div>
   );

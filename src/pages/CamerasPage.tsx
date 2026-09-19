@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Space, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, InputNumber, Space, Popconfirm, notification } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCatalog } from '@/store/catalog';
 import type { Camera } from '@/features/drones/types';
+import { cameraSchema } from '@/features/drones/schema';
 
 export function CamerasPage() {
   const { cameras, addCamera, updateCamera, removeCamera } = useCatalog();
@@ -24,11 +25,20 @@ export function CamerasPage() {
 
   const handleOk = async () => {
     const values = await form.validateFields();
-    if (editing) {
-      updateCamera({ ...editing, ...values });
-    } else {
-      addCamera({ ...values, id: crypto.randomUUID() });
+    const parsed = cameraSchema.safeParse({
+      ...values,
+      id: editing?.id ?? crypto.randomUUID(),
+    });
+    if (!parsed.success) {
+      notification.error({
+        message: 'Некорректные данные',
+        description: parsed.error.errors[0]?.message ?? 'Проверьте поля',
+        placement: 'topRight',
+      });
+      return;
     }
+    if (editing) updateCamera(parsed.data);
+    else addCamera(parsed.data);
     setIsModalOpen(false);
   };
 
@@ -77,14 +87,14 @@ export function CamerasPage() {
         cancelText="Отмена"
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
-            <Input placeholder="Zenmuse H20T" />
+          <Form.Item name="name" label="Название" rules={[{ required: true, max: 100 }]}>
+            <Input placeholder="Zenmuse H20T" maxLength={100} />
           </Form.Item>
           <Form.Item name="fovDeg" label="Угол обзора FOV (°)" rules={[{ required: true }]}>
             <InputNumber min={1} max={360} className="w-full" />
           </Form.Item>
           <Form.Item name="resolutionMp" label="Разрешение (Мп)" rules={[{ required: true }]}>
-            <InputNumber min={1} max={200} className="w-full" />
+            <InputNumber min={1} max={500} className="w-full" />
           </Form.Item>
           <Form.Item name="focalLengthMm" label="Фокусное расстояние (мм)" rules={[{ required: true }]}>
             <InputNumber min={1} max={2000} className="w-full" />

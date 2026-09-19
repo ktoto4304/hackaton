@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, Space, Popconfirm, notification } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCatalog } from '@/store/catalog';
 import type { Drone, DroneType } from '@/features/drones/types';
+import { droneSchema } from '@/features/drones/schema';
 
 const TYPE_LABELS: Record<DroneType, string> = {
   quadcopter: 'Мультироторный',
@@ -31,11 +32,23 @@ export function DronesPage() {
 
   const handleOk = async () => {
     const values = await form.validateFields();
-    if (editing) {
-      updateDrone({ ...editing, ...values });
-    } else {
-      addDrone({ ...values, id: crypto.randomUUID() });
+
+    const parsed = droneSchema.safeParse({
+      ...values,
+      id: editing?.id ?? crypto.randomUUID(),
+    });
+    if (!parsed.success) {
+      notification.error({
+        message: 'Некорректные данные',
+        description: parsed.error.errors[0]?.message ?? 'Проверьте поля',
+        placement: 'topRight',
+      });
+      return;
     }
+
+    if (editing) updateDrone(parsed.data);
+    else addDrone(parsed.data);
+
     setIsModalOpen(false);
   };
 
@@ -53,16 +66,8 @@ export function DronesPage() {
       key: 'maxFlightTimeMin',
       sorter: (a: Drone, b: Drone) => a.maxFlightTimeMin - b.maxFlightTimeMin,
     },
-    {
-      title: 'Скорость (м/с)',
-      dataIndex: 'cruiseSpeedMs',
-      key: 'cruiseSpeedMs',
-    },
-    {
-      title: 'Взлётный вес (г)',
-      dataIndex: 'maxTakeoffWeightG',
-      key: 'maxTakeoffWeightG',
-    },
+    { title: 'Скорость (м/с)', dataIndex: 'cruiseSpeedMs', key: 'cruiseSpeedMs' },
+    { title: 'Взлётный вес (г)', dataIndex: 'maxTakeoffWeightG', key: 'maxTakeoffWeightG' },
     {
       title: 'Действия',
       key: 'actions',
@@ -102,24 +107,20 @@ export function DronesPage() {
         cancelText="Отмена"
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Название" rules={[{ required: true }]}>
-            <Input placeholder="DJI Mavic 3 Enterprise" />
+          <Form.Item name="name" label="Название" rules={[{ required: true, max: 100 }]}>
+            <Input placeholder="DJI Mavic 3 Enterprise" maxLength={100} />
           </Form.Item>
-
           <Form.Item name="type" label="Тип" rules={[{ required: true }]}>
             <Select
               options={Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label }))}
             />
           </Form.Item>
-
           <Form.Item name="maxFlightTimeMin" label="Макс. время полёта (мин)" rules={[{ required: true }]}>
             <InputNumber min={1} max={2000} className="w-full" />
           </Form.Item>
-
           <Form.Item name="cruiseSpeedMs" label="Крейсерская скорость (м/с)" rules={[{ required: true }]}>
             <InputNumber min={1} max={200} className="w-full" />
           </Form.Item>
-
           <Form.Item name="maxTakeoffWeightG" label="Макс. взлётный вес (г)" rules={[{ required: true }]}>
             <InputNumber min={1} max={100000} className="w-full" />
           </Form.Item>

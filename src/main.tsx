@@ -5,9 +5,11 @@ import ruRU from 'antd/locale/ru_RU';
 import './index.css';
 import App from './App.tsx';
 import { useThemeStore } from '@/store/theme';
+import { useGlobalErrorHandler } from '@/hooks/useGlobalErrorHandler';
 
 function ThemedApp() {
   const isDark = useThemeStore((s) => s.isDark);
+  useGlobalErrorHandler();
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);

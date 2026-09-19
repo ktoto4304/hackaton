@@ -121,23 +121,35 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html, body, #root {
+
+  /* КРИТИЧНО: без этих правил h-full/h-dvh во вложенных компонентах
+     даёт 0, потому что 100% от auto = 0. */
+  html,
+  body,
+  #root {
     height: 100%;
+    margin: 0;
+    padding: 0;
   }
+
   body {
     @apply bg-background text-foreground;
-    /* Убираем 300ms задержку тапа и «двойной тап-зум» на кнопках */
     -webkit-tap-highlight-color: transparent;
+    overflow: hidden; /* приложение full-screen, скролл внутри панелей */
   }
+
   html {
     @apply font-sans;
   }
-  button, a, [role="button"] {
+
+  button,
+  a,
+  [role="button"] {
     touch-action: manipulation;
   }
 }
 
-/* OpenLayers: viewport карты занимает весь контейнер */
+/* OpenLayers */
 .ol-viewport {
   width: 100% !important;
   height: 100% !important;
@@ -147,7 +159,28 @@
   display: block;
 }
 
-/* На тач-устройствах увеличиваем hit-area у OL-контролов, если они появятся */
+/* ScaleLine */
+.ol-scale-line {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.dark .ol-scale-line {
+  background: rgba(20, 20, 20, 0.8);
+  color: #fff;
+}
+
+.ol-scale-line-inner {
+  border-color: currentColor;
+  color: inherit;
+}
+
+.ol-attribution {
+  font-size: 11px;
+}
+
 @media (pointer: coarse) {
   .ol-control button {
     min-width: 2.5rem;

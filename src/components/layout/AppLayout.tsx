@@ -13,9 +13,11 @@ export function AppLayout() {
   ];
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-background">
-      {/* Сайдбар: на узких экранах — только иконки (w-14),
-          на lg и шире — с подписями (w-56). */}
+    // h-screen — fallback для старых браузеров без dvh.
+    // h-dvh — корректная высота с учётом адресной строки Safari на iPad.
+    // overflow-hidden — приложение full-screen, скролл внутри панелей.
+    <div className="flex h-screen w-full overflow-hidden bg-background [height:100dvh]">
+      {/* Сайдбар: узкий (иконки) на < lg, полный на ≥ lg */}
       <aside className="w-14 lg:w-56 shrink-0 border-r border-border bg-card p-2 lg:p-4 overflow-auto">
         <div className="mb-6 hidden lg:block">
           <h1 className="text-lg font-semibold">БВС Планировщик</h1>
@@ -47,7 +49,9 @@ export function AppLayout() {
         </nav>
       </aside>
 
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+      {/* Правая часть: header + Outlet. flex-col + min-w-0 + overflow-hidden
+          + h-full (наследует от h-screen родителя). */}
+      <div className="flex h-full flex-1 flex-col min-w-0 overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 lg:px-6 gap-3">
           <span className="text-sm text-muted-foreground truncate">
             Расчёт оптимального полётного задания для группы БВС
@@ -63,6 +67,8 @@ export function AppLayout() {
           </Button>
         </header>
 
+        {/* flex-1 + min-h-0 — критично, чтобы Outlet имел высоту
+            (flex-1 в колонке даёт высоту, min-h-0 не даёт схлопнуться). */}
         <div className="relative flex-1 min-h-0 overflow-hidden">
           <Outlet />
         </div>
