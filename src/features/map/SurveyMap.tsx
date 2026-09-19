@@ -109,7 +109,6 @@ interface RouteResult {
 interface SurveyMapProps {
   onRoutesCalculated?: (routes: RouteResult[]) => void;
   onWarnings?: (warnings: RouteWarning[]) => void;
-  droneOrder?: number[];
   onMetrics?: (geo: CameraGeometry | null, areaHa: number | null) => void;
   onElevation?: (points: ElevationPoint[], flightHeightM: number) => void;
 }
@@ -119,7 +118,6 @@ const BASEMAP_IDS: BasemapId[] = ['voyager', 'dark', 'satellite'];
 export function SurveyMap({
   onRoutesCalculated,
   onWarnings,
-  droneOrder,
   onMetrics,
   onElevation,
 }: SurveyMapProps) {
@@ -296,7 +294,6 @@ export function SurveyMap({
         return;
       }
 
-      // --- Подложки: все три сразу, переключаем setVisible ---
       const basemaps: Partial<Record<BasemapId, TileLayer<XYZ>>> = {};
       BASEMAP_IDS.forEach((id) => {
         const layer = createBasemapLayer(id);
@@ -306,7 +303,6 @@ export function SurveyMap({
       });
       basemapLayersRef.current = basemaps;
 
-      // --- ВПП ---
       const pointsSource = new VectorSource();
       INITIAL_RUNWAYS.forEach(({ lonLat, name }) => {
         const f = new Feature({ geometry: new Point(fromLonLat(lonLat)), name });
@@ -314,7 +310,6 @@ export function SurveyMap({
         pointsSource.addFeature(f);
       });
 
-      // --- Полигоны ---
       const polygonSource = new VectorSource();
       const polygonFeature = new Feature({
         geometry: new Polygon([
@@ -947,11 +942,8 @@ export function SurveyMap({
         onChange={handleFileChosen}
       />
 
-      {/*
-        Кнопка возврата плашки, если скрыта.
-        left-16 (64px) — правее кнопки сворачивания левой панели
-        (та занимает left: 0.5rem … ~52px, когда панель закрыта).
-      */}
+      {/* Кнопка возврата плашки, если скрыта.
+          left-16 — правее кнопки сворачивания левой панели. */}
       {!topBarVisible && (
         <button
           type="button"
@@ -967,7 +959,6 @@ export function SurveyMap({
       {/* Верхняя плашка */}
       {topBarVisible && (
         <div className="absolute top-20 lg:top-16 left-4 right-4 lg:right-auto z-10 flex flex-wrap items-center gap-2 rounded-lg bg-background/90 p-2 shadow-lg border border-border backdrop-blur lg:max-w-[calc(100%-2rem)]">
-          {/* Основные кнопки — всегда видны */}
           <Button
             variant={mode === 'polygon' ? 'default' : 'outline'}
             size="sm"
@@ -997,7 +988,6 @@ export function SurveyMap({
             Рассчитать
           </Button>
 
-          {/* Popover «Ещё» */}
           <Popover
             content={secondaryContent}
             trigger="click"
@@ -1021,7 +1011,6 @@ export function SurveyMap({
             onGoToBookmark={(b) => goTo(b.center[0], b.center[1], b.zoom)}
           />
 
-          {/* Скрыть плашку */}
           <Button
             variant="outline"
             size="sm"

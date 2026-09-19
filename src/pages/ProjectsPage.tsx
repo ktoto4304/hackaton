@@ -39,7 +39,6 @@ interface MapMetrics {
 export function ProjectsPage() {
   const [routes, setRoutes] = useState<RouteResult[]>([]);
   const [warnings, setWarnings] = useState<RouteWarning[]>([]);
-  const [droneOrder, setDroneOrder] = useState<number[]>([]);
   const [metrics, setMetrics] = useState<MapMetrics>({ geo: null, areaHa: null });
   const [elevation, setElevation] = useState<ElevationPoint[]>([]);
   const [elevationFlightHeight, setElevationFlightHeight] = useState(100);
@@ -60,7 +59,6 @@ export function ProjectsPage() {
   );
 
   const totalFlightMin = routes.reduce((s, r) => s + r.timeMin, 0);
-  const maxBattery = Math.max(...routes.map((r) => drones[r.droneId]?.maxFlightTimeMin ?? 0), 0);
   const swapsTotal = routes.reduce((s, r) => {
     const d = drones[r.droneId];
     if (!d) return s;
@@ -96,7 +94,7 @@ export function ProjectsPage() {
           </div>
           <div>
             <h3 className="text-sm font-medium mb-2">Маршруты</h3>
-            <DraggableRouteTable routes={routes} onReorder={setDroneOrder} />
+            <DraggableRouteTable routes={routes} />
           </div>
           {elevation.length > 0 && (
             <div>
@@ -129,7 +127,6 @@ export function ProjectsPage() {
             <SurveyMap
               onRoutesCalculated={handleRoutes}
               onWarnings={setWarnings}
-              droneOrder={droneOrder}
               onMetrics={(geo, areaHa) => setMetrics({ geo, areaHa })}
               onElevation={(points, flightHeightM) => {
                 setElevation(points);

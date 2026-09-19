@@ -65,9 +65,9 @@ export const useMapView = create<MapViewState>()(
     }),
     {
       name: 'bvs-map-view',
-      version: 3, // ← подняли, чтобы миграция сработала у всех
+      version: 3,
       storage: createJSONStorage(() => localStorage),
-      migrate: (persisted: any, version) => {
+      migrate: (persisted: any) => {
         // v < 3: гарантируем наличие всех полей и корректные типы.
         const base = { ...DEFAULT_STATE, ...(persisted ?? {}) };
         return {
@@ -89,7 +89,6 @@ export const useMapView = create<MapViewState>()(
       /**
        * Кастомный merge: берём дефолт как основу, поверх — persisted,
        * но НИКОГДА не даём undefined из persisted перекрыть дефолт.
-       * Это защищает от старых записей, где поле отсутствовало или было null.
        */
       merge: (persisted: any, current) => {
         const p = persisted ?? {};
